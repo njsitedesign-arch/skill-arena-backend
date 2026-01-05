@@ -8,6 +8,10 @@ app.use(express.json());
 let players = [];
 let results = {};
 
+app.get("/", (req, res) => {
+  res.send("Skill Arena Backend OK");
+});
+
 app.post("/join", (req, res) => {
   const { player } = req.body;
   if (!players.includes(player)) players.push(player);
@@ -22,17 +26,17 @@ app.post("/result", (req, res) => {
     const winner =
       Object.keys(results).sort((a, b) => results[a] - results[b])[0];
 
-    res.json({ winner, results });
+    const response = { winner, results };
     results = {};
     players = [];
-  } else {
-    res.json({ status: "waiting" });
+    return res.json(response);
   }
+
+  res.json({ status: "waiting" });
 });
 
-app.get("/", (req, res) => {
-  res.send("Skill Arena Server Running");
-});
+const PORT = process.env.PORT || 8080;
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("Server running"));
+app.listen(PORT, "0.0.0.0", () => {
+  console.log("Server running on port", PORT);
+});
