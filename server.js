@@ -1,42 +1,70 @@
-const express = require("express");
-const cors = require("cors");
+const WebSocket = require("ws");
 
-const app = express();
-app.use(cors());
-app.use(express.json());
+const PORT = process.env.PORT || 3000;
+const wss = new WebSocket.Server({ port: PORT });
 
 let players = [];
-let results = {};
 
-app.get("/", (req, res) => {
-  res.send("Skill Arena Backend OK");
-});
-
-app.post("/join", (req, res) => {
-  const { player } = req.body;
-  if (!players.includes(player)) players.push(player);
-  res.json({ players });
-});
-
-app.post("/result", (req, res) => {
-  const { player, score } = req.body;
-  results[player] = score;
-
-  if (Object.keys(results).length === 2) {
-    const winner =
-      Object.keys(results).sort((a, b) => results[a] - results[b])[0];
-
-    const response = { winner, results };
-    results = {};
-    players = [];
-    return res.json(response);
+wss.on("connection", (ws) => {
+  if (players.length >= 2) {
+    ws.close();
+    return;
   }
 
-  res.json({ status: "waiting" });
+  const player = {
+    id: players.length,
+    x: players.length === 0 ? 50 : 350,
+    y: 200,
+    dx: 1,
+    dy: 0,
+    alive: true,
+    ws
+  };
+
+  players.push(player);
+
+  ws.on("message", (msg) => {
+    const data = JSON.parse(msg);
+    if (data.type === "move") {
+      player.dx = data.dx;
+      player.dy = data.dy;
+    }
+  });
+
+  ws.on("close", () => {
+    players = [];
+  });
 });
 
-const PORT = process.env.PORT || 8080;
+function gameLoop() {
+  if (players.length < 2) return;
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log("Server running on port", PORT);
-});
+  players.forEach(p => {
+    if (!p.alive) return;
+
+    p.x += p.dx * 2;
+    p.y += p.dy * 2;
+
+    if (p.x < 0 || p.x > 400 || p.y < 0 || p.y > 400) {
+      p.alive = false;
+    }
+  });
+
+  const state = {
+    type: "state",
+    players: players.map(p => ({
+      id: p.id,
+      x: p.x,
+      y: p.y,
+      alive: p.alive
+    }))
+  };
+
+  players.forEach(p => {
+    p.ws.send(JSON.stringify(state));
+  });
+}
+
+setInterval(gameLoop, 50);
+
+console.log("WebSocket server running on", PORT);
