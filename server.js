@@ -7,21 +7,25 @@ let players = [];
 
 wss.on("connection", (ws) => {
   if (players.length >= 2) {
+    ws.send(JSON.stringify({ type: "full" }));
     ws.close();
     return;
   }
 
+  const id = players.length;
   const player = {
-    id: players.length,
-    x: players.length === 0 ? 50 : 350,
+    id,
+    x: id === 0 ? 100 : 300,
     y: 200,
-    dx: 1,
+    dx: 0,
     dy: 0,
     alive: true,
     ws
   };
 
   players.push(player);
+
+  ws.send(JSON.stringify({ type: "init", id }));
 
   ws.on("message", (msg) => {
     const data = JSON.parse(msg);
@@ -36,12 +40,11 @@ wss.on("connection", (ws) => {
   });
 });
 
-function gameLoop() {
+function tick() {
   if (players.length < 2) return;
 
   players.forEach(p => {
     if (!p.alive) return;
-
     p.x += p.dx * 2;
     p.y += p.dy * 2;
 
@@ -60,11 +63,8 @@ function gameLoop() {
     }))
   };
 
-  players.forEach(p => {
-    p.ws.send(JSON.stringify(state));
-  });
+  players.forEach(p => p.ws.send(JSON.stringify(state)));
 }
 
-setInterval(gameLoop, 50);
-
-console.log("WebSocket server running on", PORT);
+setInterval(tick, 50);
+console.log("WebSocket multiplayer server running on", PORT);
